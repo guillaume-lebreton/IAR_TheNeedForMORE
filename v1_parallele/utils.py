@@ -14,7 +14,7 @@ def sliding_cumulative_reward(all_rewards, window_size):
     sliding[:, :, window_size:] = sliding[:, :, window_size:] - sliding[:, :, :-window_size]
     return sliding
 
-def plot_cumulative_sliding_reward(sliding_cumulative_rewards, window_size, eps, lr, nb_episodes, nb_criteres):
+def plot_cumulative_sliding_reward(sliding_cumulative_rewards, window_size, eps, lr, nb_episodes, nb_criteres, nameAlgo="standard"):
     """
         Affiche la courbe de la récompense cumulée glissante
         sliding_cumulative_rewards : shape (K, nb_episodes, nb_steps)
@@ -28,7 +28,7 @@ def plot_cumulative_sliding_reward(sliding_cumulative_rewards, window_size, eps,
         plt.fill_between(range(mean_rewards.shape[1]), mean_rewards[k]-std_rewards[k], mean_rewards[k]+std_rewards[k], alpha=0.2)
         plt.xlabel("t")
         plt.ylabel(f"Sliding Cumulative reward T={window_size}")
-        plt.title(f"Separate objectives: standard\n epsilon={eps}, lr={lr}, nb_episodes={nb_episodes}")
+        plt.title(f"Separate objectives: {nameAlgo}\n epsilon={eps}, lr={lr}, nb_episodes={nb_episodes}")
 
     plt.grid()
     plt.legend()
