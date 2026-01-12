@@ -4,6 +4,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from utils import *
 
+"""
+    programme principal pour exécuter les différents algorithmes de RL sur les MDPs
+    
+    Permet de choisir quel algorithme exécuter et quel MDP utiliser
+    Affiche les résultats sous forme de graphiques
+"""
+
 
 PAS_DISCR = 0.001 # Pour MORE
 EPS = 0.5

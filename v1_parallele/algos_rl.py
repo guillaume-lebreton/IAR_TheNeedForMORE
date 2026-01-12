@@ -3,8 +3,15 @@ import copy
 from tqdm import tqdm
 
 
-# from mdp import mdp_standard, mdp_satiete, mdp_batterie
+""""
+    Algorithmes de Reinforcement Learning en plusieurs classes:
+    - QLearningStandard : Q-learning avec somme pondérée des récompenses
+    - QLearningObjectiveSwitching : Q-learning avec switching d'objectif
+    - QLearningMORE : Q-learning avec approche MORE
 
+    Tous les algorithmes héritent de la classe RL qui contient les fonctions communes:
+    Tous les algorithmes possèdent une fonction train()
+"""
 
 def weighted_sum(rewards, weights=[1,1]):
     """ calcule la somme pondérée des rewards """

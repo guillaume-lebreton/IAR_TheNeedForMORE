@@ -2,8 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from algos_rl import V_MORE
 
-
-
+"""
+    fonctions utils pour faires des plots
+"""
 
 
 ###### Fonctions de courbes ######

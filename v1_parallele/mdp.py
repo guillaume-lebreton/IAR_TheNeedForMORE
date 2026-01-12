@@ -1,5 +1,12 @@
 import numpy as np
 
+"""
+    Initialisation des MDPs utilisés dans le projet
+    - MDP standard
+    - MDP avec satiété
+    - MDP avec batterie
+    - MDP avec setpoint
+"""
 
 class MDP:
     def __init__(self, states, init_state, actions, transitions, rewards, discount_factor):
