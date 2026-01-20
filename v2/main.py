@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from algos_rl import (
     QLearningStandard,
     QLearningObjectiveSwitching,
-    QLearningMORE
+    QLearningMORE,
+    QLearningMORE_LLR
 )
 
 from mdp import mdp_standard, mdp_satiete, mdp_batterie, mdp_setpoint
@@ -66,7 +67,7 @@ def run_and_plot(algo_name, algo):
 
     # Déballage selon l'algo
     if algo_name == "MORE":
-        _, all_rewards, _, _, all_states = outputs
+        _, all_rewards, all_states, _ = outputs
     else:
         _, all_rewards, all_states = outputs
 
@@ -101,40 +102,52 @@ def main():
     # -----------------------------
     # Q-LEARNING STANDARD
     # -----------------------------
-    q_standard = QLearningStandard(
-        mdp=mdp,
-        gamma=GAMMA,
-        alpha=ALPHA,
-        epsilon_init=EPSILON,
-        reward_weights=[1, 1]
-    )
-    run_and_plot("standard", q_standard)
+    # q_standard = QLearningStandard(
+    #     mdp=mdp,
+    #     gamma=GAMMA,
+    #     alpha=ALPHA,
+    #     epsilon_init=EPSILON,
+    #     reward_weights=[1, 1]
+    # )
+    # run_and_plot("standard", q_standard)
 
     # -----------------------------
     # OBJECTIVE SWITCHING
     # -----------------------------
-    q_switch = QLearningObjectiveSwitching(
-        mdp=mdp,
-        gamma=GAMMA,
-        alpha=ALPHA,
-        epsilon_init=EPSILON
-    )
-    run_and_plot("switch", q_switch)
+    # q_switch = QLearningObjectiveSwitching(
+    #     mdp=mdp,
+    #     gamma=GAMMA,
+    #     alpha=ALPHA,
+    #     epsilon_init=EPSILON
+    # )
+    # run_and_plot("switch", q_switch)
 
     # -----------------------------
     # MORE-Q
     # -----------------------------
-    W = np.arange(0, 1.01, PAS_DISCR)
+    # W = np.arange(0, 1.01, PAS_DISCR)
 
-    q_more = QLearningMORE(
+    # q_more = QLearningMORE(
+    #     mdp=mdp,
+    #     gamma=GAMMA,
+    #     alpha=ALPHA,
+    #     epsilon_init=EPSILON,
+    #     gamma_paste=GAMMA_PASTE,
+    #     W=W
+    # )
+    # run_and_plot("MORE", q_more)
+
+    # -----------------------------
+    # MORE-Q LLR
+    # -----------------------------
+    more_llr = QLearningMORE_LLR(
         mdp=mdp,
         gamma=GAMMA,
         alpha=ALPHA,
         epsilon_init=EPSILON,
-        gamma_paste=GAMMA_PASTE,
-        W=W
+        gamma_paste=GAMMA_PASTE
     )
-    run_and_plot("MORE", q_more)
+    run_and_plot("MORE", more_llr)
 
 if __name__ == "__main__":
     main()

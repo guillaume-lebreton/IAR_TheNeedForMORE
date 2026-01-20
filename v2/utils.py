@@ -52,7 +52,7 @@ def avg_stay_length_curves(all_state,n_states=3,beta=0.01,scale=1):
                 for s2 in range(n_states):
                     curves[s2][k] = last_value[s2]
 
-        # EMA finale (COMME AVANT)
+        # EMA finale
         avg_curves = {s: exponential_moving_average(curves[s], beta=beta, scale=scale) for s in curves}
 
         # stocker cet épisode

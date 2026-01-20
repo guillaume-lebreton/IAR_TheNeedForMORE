@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import copy
 from tqdm import tqdm
@@ -191,16 +192,25 @@ class QLearningMORE(RL):
         res =  w0 * np.exp(-q0) + (1 - w0) * np.exp(-q1)
         return -res
 
+    # def discretize_w(self, w, verbose=False):
+    #     """ retourne le poids dans W le plus proche de w et son index """
+    #     if verbose:
+    #         print("discretize_w input:", w)
+    #         print("W:", self.W)
+    #     diff = np.abs(w - self.W[None, :])
+    #     idx = np.argmin(diff, axis=1)
+    #     if verbose:
+    #         print("idx proche:", idx)
+    #     return self.W[idx], idx # valeur discrétisée et index dans W
+    
     def discretize_w(self, w, verbose=False):
         """ retourne le poids dans W le plus proche de w et son index """
         if verbose:
             print("discretize_w input:", w)
             print("W:", self.W)
-        diff = np.abs(w - self.W[None, :])
-        idx = np.argmin(diff, axis=1)
-        if verbose:
-            print("idx proche:", idx)
-        return self.W[idx], idx # valeur discrétisée et index dans W
+        w = float(w)
+        idx = int(np.argmin(np.abs(self.W - w)))
+        return float(self.W[idx]), idx # valeur discrétisée et index dans W
 
     def choose_action(self, state, idx_w0, w0, epsilon, verbose=False):
         """ choisit l'action selon epsilon-greedy 
@@ -233,9 +243,11 @@ class QLearningMORE(RL):
         
         return w0 # nouveau poids w0 normalisé entre [0,1]
 
+
     def train(self, nb_episodes, nb_steps, nb_criteres, verbose=False, diminution_epsilon_steps=2000, w0_init=0.5):
         
         self.q_lin = np.zeros((len(self.mdp.states), len(self.W), len(self.mdp.actions), nb_criteres)) # q(s, w, a) -> K sorties
+        self.q_lin += 1e-3 * np.random.randn(*self.q_lin.shape) #bruit initial
         print("q_lin shape:", self.q_lin.shape)
 
         evolution_w0 = np.zeros((nb_episodes, nb_steps))  # pour stocker l'évolution du poids w0
@@ -323,7 +335,6 @@ class QLearningMORE(RL):
                 state = state_next
                 w_0 = new_w0
                 idx_w0 = new_idx_w0
-
             
                 
                 if diminution_epsilon_steps > 0 and t > 0 and t % diminution_epsilon_steps == 0:
@@ -337,3 +348,159 @@ class QLearningMORE(RL):
             print("*$*$*$*$*$*$ Fin training Q_MORE *$*$*$*$*$*$")
 
         return self.q_lin, all_reward_MORE, evolution_w0, evolution_w0_discret, all_state
+    
+
+# MORE avec LLR
+class LocalLinearModel:
+    """
+    LLR pour approximer Q_LIN(s, w0, a)
+    - entrée : w0
+    - sortie : (Q0, Q1)
+    """
+    def __init__(self, radius=0.4, max_points=100):
+        self.radius = radius
+        self.max_points = max_points
+        self.W0 = []   # w0_i
+        self.Q = []    # Q_i 
+
+    def add_sample(self, w0, q, merge_radius=0.02):
+        w0 = float(w0)
+        q = np.array(q, dtype=float)
+
+        self.W0.append(w0)
+        self.Q.append(q)
+
+        if len(self.W0) > self.max_points:
+            self.W0.pop(0)
+            self.Q.pop(0)
+
+    def predict(self, w0):
+        """
+        Standard Locally Linear Regression (LLR)
+        - entrée : w0 
+        - sortie : Q_LIN(s, w0, a) 
+        """
+        if len(self.W0) < 2:
+            return np.zeros(2)
+
+        w0 = float(w0)
+        W0 = np.array(self.W0)          
+        Q  = np.vstack(self.Q)         
+
+        # distances locales en weight-space (1D)
+        d = np.abs(W0 - w0)
+        mask = d <= self.radius
+
+        # aucun voisin local → plus proche voisin
+        if not np.any(mask):
+            return Q[np.argmin(d)]
+              
+        Qloc = Q[mask]               
+        dloc = d[mask]            
+
+        # noyau gaussien
+        weights = np.exp(-(dloc / self.radius) ** 2)
+        weights /= np.sum(weights)                  
+
+        return weights @ Qloc
+ 
+class QLearningMORE_LLR(RL):
+    """
+    MORE-Q Learning avec LLR
+    """
+    def __init__(self, mdp, gamma, alpha, epsilon_init, gamma_paste, radius=0.4, max_points=100):
+        super().__init__(mdp, gamma, alpha, epsilon_init)
+        self.gamma_paste = gamma_paste
+        self.radius = radius
+        self.max_points = max_points
+        self.models = None   # 6 LLR : (s,a)
+
+    def Q_more(self, q_lin, w0):
+        """
+        Q_MORE(s,w,a) = - ( w0*exp(-Q0) + (1-w0)*exp(-Q1) )
+        """
+        q0, q1 = q_lin
+        return - (w0 * np.exp(-q0) + (1 - w0) * np.exp(-q1))
+        
+    def update_w(self, w0, reward):
+        """
+        maj w0
+        """
+        r0, r1 = reward
+        a0 = (w0 ** self.gamma_paste) * np.exp(-r0)
+        a1 = ((1 - w0) ** self.gamma_paste) * np.exp(-r1)
+        w0 = a0 / (a0 + a1)
+        return w0
+
+    def greedy_more_action(self, state, w0):
+        qvals = []
+        for a in self.mdp.actions:
+            q_lin = self.models[state][a].predict(w0)
+            qvals.append(self.Q_more(q_lin, w0))
+        return int(np.argmax(qvals))
+
+    def train(self, nb_episodes, nb_steps, nb_criteres, verbose=False,
+              diminution_epsilon_steps=2000, w0_init=0.5):
+
+        # init des 6 LLR
+        self.models = {
+            s: {a: LocalLinearModel(self.radius, self.max_points)
+                for a in self.mdp.actions}
+            for s in self.mdp.states
+        }
+
+        all_rewards = np.zeros((2, nb_episodes, nb_steps))
+        all_states = []
+        all_w0 = np.zeros((nb_episodes, nb_steps))
+
+        for ep in tqdm(range(nb_episodes), desc="MORE-LLR"):
+            state = self.mdp.reset()
+            epsilon = self.epsilon_init
+            w0 = float(w0_init)
+            states = []
+
+            for t in range(nb_steps):
+
+                if verbose:
+                    print("\nstep", t)
+                    print(f"w_0={w0}, w_1={1 - w0}, epsilon={epsilon}")
+
+                if diminution_epsilon_steps > 0 and t > 0 and t % diminution_epsilon_steps == 0:
+                    epsilon *= 0.5
+                    print(f"{t=}, w_0={w0}, w_1={1 - w0}, epsilon={epsilon}")
+
+                # choix action
+                if np.random.rand() < epsilon:
+                    a = np.random.choice(self.mdp.actions)
+                else:
+                    a = self.greedy_more_action(state, w0)
+
+                # transition
+                next_state, reward = self.mdp.step(state, a)
+                all_rewards[0, ep, t] = reward[0]
+                all_rewards[1, ep, t] = reward[1]
+
+                # update w
+                w0_next = self.update_w(w0, reward)
+                all_w0[ep, t] = w0_next
+
+                # action optimale suivante
+                a_star = self.greedy_more_action(next_state, w0_next)
+
+                # TD update vectoriel
+                q_lin_cur = self.models[state][a].predict(w0)
+                q_lin_next = self.models[next_state][a_star].predict(w0_next)
+                target = np.array(reward) + self.gamma * q_lin_next
+                q_updated = (1 - self.alpha) * q_lin_cur + self.alpha * target
+
+                # apprentissage LLR
+                self.models[state][a].add_sample(w0, q_updated)
+
+                states.append(state)
+                state = next_state
+                w0 = w0_next
+
+            all_states.append(states)
+
+        return self.models, all_rewards, all_states, all_w0
+                         
