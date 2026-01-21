@@ -62,15 +62,16 @@ class ReplayBuffer:
         return len(self.buffer)
 
 class QLearningStandard(RL):
-    def __init__(self, mdp, gamma, alpha, epsilon_init, reward_weights):
+    def __init__(self, mdp, gamma, alpha, epsilon_init, reward_weights, replay_updates=10):
         super().__init__(mdp, gamma, alpha, epsilon_init)
         self.reward_weights = reward_weights
+        self.replay_updates = replay_updates
+        self.replay = ReplayBuffer()
 
     def train(self, nb_episodes, nb_steps, nb_criteres, verbose=False, diminution_epsilon_steps=2000):
         # nb_steps: nombre de steps par épisode -> 20.000 selon papier
         
         all_reward_standard = np.zeros((nb_criteres, nb_episodes, nb_steps), dtype=float)  # taille: K x NB_EPISODES x NB_STEPS
-        all_state_space_traversal = []
         all_state = []
 
         for episode in tqdm(range(nb_episodes), desc="Episodes"): 
@@ -79,12 +80,6 @@ class QLearningStandard(RL):
             q = self.mdp.q_init()
             state = self.mdp.reset()
             epsilon = self.epsilon_init  # reset epsilon au début de chaque épisode
-
-            ## INIT ##
-            # dico pour stocker pour chaque etats le moment ou on l'a visité pendant l'episode
-            state_space_traversal = {}
-            for key in self.mdp.states:
-                state_space_traversal[key] = np.array([])
 
             states = []
 
@@ -96,17 +91,15 @@ class QLearningStandard(RL):
                 # Approche classique: somme pondérée des récompenses
                 sum_reward = weighted_sum(reward, weights=self.reward_weights)
 
+                # Udpate current
                 self.Q_learning_update(state, a, sum_reward, state_next, q)
 
-                # # stockage des états visités
-                for key in self.mdp.states:
-                    if key == state:
-                        if len(state_space_traversal[key]) == 0:
-                            state_space_traversal[key] = np.append(state_space_traversal[key], 1)
-                        else:
-                            state_space_traversal[key] = np.append(state_space_traversal[key],state_space_traversal[key][-1]+1)
-                    else:
-                        state_space_traversal[key] = np.append(state_space_traversal[key], 0)
+                # ajout dans le buffer
+                self.replay.add((state, a, sum_reward, state_next))
+
+                # replay
+                for (s, a_r, r_r, s2) in self.replay.sample(self.replay_updates):
+                    self.Q_learning_update(s, a_r, r_r, s2, q)
 
                 #Stockage de l'etat visité
                 states.append(state)
@@ -120,7 +113,6 @@ class QLearningStandard(RL):
                     epsilon = epsilon/2  # diminution epsilon par épisode
                     # epsilon = epsilon * 0.99  # -> donne de meilleurs résultats pour le calcule de VMORE
 
-            all_state_space_traversal.append(copy.deepcopy(state_space_traversal))
             all_state.append(states)
 
             if verbose:
@@ -130,9 +122,11 @@ class QLearningStandard(RL):
         return q, all_reward_standard, all_state
 
 class QLearningObjectiveSwitching(RL):
-    def __init__(self, mdp, gamma, gamma_past, alpha, epsilon_init):
+    def __init__(self, mdp, gamma, gamma_past, alpha, epsilon_init, replay_updates=10):
         super().__init__(mdp, gamma, alpha, epsilon_init)
         self.gamma_past = gamma_past
+        self.replay_updates = replay_updates
+        self.replay = ReplayBuffer()
 
     def train(self, nb_episodes, nb_steps, nb_criteres, verbose=False, diminution_epsilon_steps=2000):
         all_reward_objective_switching = np.zeros((nb_criteres, nb_episodes, nb_steps), dtype=float)  # taille: K x NB_EPISODES x NB_STEPS
@@ -147,8 +141,7 @@ class QLearningObjectiveSwitching(RL):
             epsilon = self.epsilon_init  # reset epsilon au début de chaque épisode
 
             states = []
-
-            # somme cumulée des récompenses pour chaque critère : Pour pouvoir faire le switching
+            
             sum_cum_r0 = 0
             sum_cum_r1 = 0
 
@@ -166,15 +159,23 @@ class QLearningObjectiveSwitching(RL):
                 r0 = reward[0]
                 r1 = reward[1]
 
-                # sum_cum_r0 = self.gamma_past * sum_cum_r0 +r0
+                # sum_cum_r0 = self.gamma_past * sum_cum_r0 + r0
                 # sum_cum_r1 = self.gamma_past * sum_cum_r1 + r1
-                
+
                 sum_cum_r0 += r0
                 sum_cum_r1 += r1
-
-                # MAJ de chaque Q-table avec SON reward
+                
+                # MAJ de chaque Q-table avec SA reward
                 self.Q_learning_update(state, a, r0, state_next, Q0)
                 self.Q_learning_update(state, a, r1, state_next, Q1)
+
+                # ajout dans le replay buffer
+                self.replay.add((state, a, reward, state_next))
+
+                # replay
+                for (s, a_r, r_r, s2) in self.replay.sample(self.replay_updates):
+                    self.Q_learning_update(s, a_r, r_r[0], s2, Q0)
+                    self.Q_learning_update(s, a_r, r_r[1], s2, Q1)
 
                 #Stockage de l'etat visité
                 states.append(state)
@@ -203,43 +204,26 @@ class LocalLinearModel:
     - entrée : w0
     - sortie : (Q0, Q1)
     """
-    def __init__(self, radius=0.4, max_points=100):
+    def __init__(self, radius=0.4, max_points=50):
         self.radius = radius
         self.max_points = max_points
         self.W0 = []   # w0_i
         self.Q = []    # Q_i 
 
-    # def add_sample(self, w0, q, max_points=100):
-    #     w0 = float(w0)
-    #     q = np.array(q, dtype=float)
-
-    #     self.W0.append(w0)
-    #     self.Q.append(q)
-
-    #     if len(self.W0) > max_points:
-    #         self.W0.pop(0)
-    #         self.Q.pop(0)
-
     def add_sample(self, w0, q):
+        w0 = float(w0)
+        q = np.array(q, dtype=float)
 
-        # nettoyage : ne garder que les points dans un intervalle glissant
-        keep_W = [w0]
-        keep_Q = [q]
+        self.W0.append(w0)
+        self.Q.append(q)
 
-        for wi, qi in zip(self.W0, self.Q):
-            if abs(wi - w0) <= self.radius:
-                keep_W.append(wi)
-                keep_Q.append(qi)
-                if len(keep_W) >= self.max_points:
-                    break
-
-        self.W0 = keep_W
-        self.Q = keep_Q
-
+        if len(self.W0) > self.max_points:
+            self.W0.pop(0)
+            self.Q.pop(0)
 
     def predict(self, w0):
         """
-        Standard Locally Linear Regression (LLR)
+        moyenne pondérée des poids dans un rayon de 0.4
         - entrée : w0 
         - sortie : Q_LIN(s, w0, a) 
         """
@@ -266,6 +250,7 @@ class LocalLinearModel:
         weights /= np.sum(weights)                  
 
         return weights @ Qloc
+
 
 class QMORE(RL):
     """
@@ -299,7 +284,7 @@ class QMORE(RL):
         a1 = ((1 - w0) ** self.gamma_past) * np.exp(-r1)
         w0 = a0 / (a0 + a1)
         return w0
-
+    
     def greedy_action(self, state, w0):
         qvals = []
         for a in self.mdp.actions:
@@ -345,34 +330,34 @@ class QMORE(RL):
                     if verbose:
                         print(f"{t=}, w_0={w0}, w_1={1 - w0}, epsilon={epsilon}")
 
-                # ---- action MORE greedy ----
+                # choix de l'action
                 if np.random.rand() < epsilon:
                     action = np.random.choice(self.mdp.actions)
                 else:
                     action = self.greedy_action(state, w0)
 
-                # ---- transition ----
+                # transition
                 next_state, reward = self.mdp.step(state, action)
                 reward = np.array(reward, dtype=float)
 
                 for k in range(nb_criteres):
                     all_rewards[k, episode, t] = reward[k]
 
-                # ---- accumulation reward passée (clé du papier) ----
+                # accumulation des rewards
                 R_past = self.gamma_past * R_past + reward
 
-                # ---- update poids ----
+                # updtae des poids
                 w0_next = self.update_w(w0, R_past)
 
-                # ---- stockage replay ----
-                self.replay.add((state, w0, action, reward,next_state, w0_next))
-
-                # ---- update courant ----
+                # update current
                 self._q_update(state, w0, action, reward, next_state, w0_next)
 
-                # ---- replay (10 samples comme dans le papier) ----
+                # replay de 10 anciennes transition
                 for (s, w, a, r, s2, w2) in self.replay.sample(self.replay_updates):
                     self._q_update(s, w, a, r, s2, w2)
+
+                # stockage replay
+                self.replay.add((state, w0, action, reward,next_state, w0_next))
 
                 states.append(state)
 
