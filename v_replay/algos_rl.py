@@ -258,7 +258,7 @@ class QMORE(RL):
     """
 
     def __init__(self, mdp, gamma=0.9, alpha=0.2,
-                 epsilon_init=0.0, gamma_paste=0.99,
+                 epsilon_init=0.5, gamma_paste=0.99,
                  replay_updates=10):
         super().__init__(mdp, gamma, alpha, epsilon_init)
 

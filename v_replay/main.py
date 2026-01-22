@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 from algos_rl import (
     QMORE,
@@ -14,6 +15,7 @@ from utils import (
     prepare_objective_curves,
     plot_objective_curves,
     plot_MORE_curve,
+    plot_all
 )
 
 # ======================================================
@@ -52,10 +54,12 @@ def choose_mdp(name="standard"):
 # ======================================================
 # PIPELINE COMMUN DE PLOT
 # ======================================================
-def run_and_plot(algo_name, algo, verbose=False):
+def run_and_plot(algo_name, algo, mdp_name, verbose=False):
     print("=" * 60)
     print(f"Running {algo_name}")
     print("=" * 60)
+
+    start_time = time.perf_counter()
 
     outputs = algo.train(
         nb_episodes=NB_EPISODES,
@@ -63,6 +67,8 @@ def run_and_plot(algo_name, algo, verbose=False):
         nb_criteres=K,
         verbose=verbose
     )
+
+    exec_time = time.perf_counter() - start_time
 
     # Déballage selon l'algo
     if algo_name == "MORE":
@@ -74,7 +80,7 @@ def run_and_plot(algo_name, algo, verbose=False):
     # COLONNE 1 — STATE TRAVERSAL
     # ============================
     stays = avg_stay_length_curves(all_states)
-    plot_state_space_traversal(stays, algo_name)
+    # plot_state_space_traversal(stays, algo_name)
 
     # ============================
     # COLONNE 2 — REWARDS (EMA)
@@ -83,56 +89,65 @@ def run_and_plot(algo_name, algo, verbose=False):
         all_rewards,
         beta=0.001
     )
-    plot_objective_curves(r0_curves, r1_curves, algo_name)
+    # plot_objective_curves(r0_curves, r1_curves, algo_name)
 
     # ============================
     # COLONNE 3 — V_MORE
     # ============================
-    plot_MORE_curve(r0_curves, r1_curves, algo_name)
+    # plot_MORE_curve(r0_curves, r1_curves, algo_name)
+
+    #Plot les 3 dans une seule fenetre
+    path = "plots/mdp_" + mdp_name + "/" + algo_name
+    plot_all(stays, r0_curves, r1_curves, algo_name, mdp_name, exec_time, path, show=False)
 
 
 # ======================================================
 # MAIN
 # ======================================================
-def main():
-    mdp = choose_mdp("standard")
-    print("MDP choisi :", mdp)
+def main(mdp_name,standard=True, switch=True, more=True):
+
+    mdp = choose_mdp(mdp_name)
+    print("MDP choisi :", mdp_name)
 
     # -----------------------------
     # Q-LEARNING STANDARD
     # -----------------------------
-    # q_standard = QLearningStandard(
-    #     mdp=mdp,
-    #     gamma=GAMMA,
-    #     alpha=ALPHA,
-    #     epsilon_init=EPSILON,
-    #     reward_weights=[1, 1]
-    # )
-    # run_and_plot("standard", q_standard)
+    if standard:
+        q_standard = QLearningStandard(
+            mdp=mdp,
+            gamma=GAMMA,
+            alpha=ALPHA,
+            epsilon_init=EPSILON,
+            reward_weights=[1, 1]
+        )
+        run_and_plot("standard", q_standard, mdp_name)
 
     # -----------------------------
     # OBJECTIVE SWITCHING
     # -----------------------------
-    # q_switch = QLearningObjectiveSwitching(
-    #     mdp=mdp,
-    #     gamma=GAMMA,
-    #     gamma_past=GAMMA_PASTE,
-    #     alpha=ALPHA,
-    #     epsilon_init=EPSILON
-    # )
-    # run_and_plot("switch", q_switch)
+    if switch:
+        q_switch = QLearningObjectiveSwitching(
+            mdp=mdp,
+            gamma=GAMMA,
+            gamma_past=GAMMA_PASTE,
+            alpha=ALPHA,
+            epsilon_init=EPSILON
+        )
+        run_and_plot("switch", q_switch, mdp_name)
 
     # -----------------------------
     # MORE-Q LLR
     # -----------------------------
-    more_llr = QMORE(
-        mdp=mdp,
-        gamma=GAMMA,
-        alpha=ALPHA,
-        epsilon_init=EPSILON,
-        gamma_paste=GAMMA_PASTE
-    )
-    run_and_plot("MORE", more_llr, verbose=True)
+    if more:
+        more_llr = QMORE(
+            mdp=mdp,
+            gamma=GAMMA,
+            alpha=ALPHA,
+            epsilon_init=EPSILON,
+            gamma_paste=GAMMA_PASTE
+        )
+        run_and_plot("MORE", more_llr, mdp_name, verbose=True)
 
 if __name__ == "__main__":
-    main()
+    mdp_name = "setpoint"
+    main(mdp_name, standard=True, switch=True, more=True)

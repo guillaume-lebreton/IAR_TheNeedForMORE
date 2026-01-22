@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 """
     fonctions utils pour faires des plots
@@ -137,3 +138,86 @@ def plot_MORE_curve(r0_curves, r1_curves, method):
     plt.axhline(0, color='black')
     plt.grid()
     plt.show()
+
+def plot_all(all_curves, r0_curves, r1_curves, method, mdp, exec_time, save_path=None, show=True):
+    """
+    Regroupe dans une seule fenêtre :
+    1) State space traversal
+    2) Rewards
+    3) V-MORE
+    """
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharex=True)
+
+    # ======================================================
+    # 1) State space traversal
+    # ======================================================
+    ax = axes[0]
+    colors = ['red', 'black', 'blue']
+
+    for s in all_curves:
+        for i, curve in enumerate(all_curves[s]):
+            if i == 0:
+                ax.plot(curve, color=colors[s], label=f"{s=}", alpha=0.6, linewidth=0.75)
+            else:
+                ax.plot(curve, color=colors[s], alpha=0.6, linewidth=0.75)
+
+    ax.set_title("State space traversal")
+    ax.set_xlabel("t")
+    ax.set_ylabel("Average stay length")
+    ax.legend(loc="upper left")
+    ax.grid()
+
+    # ======================================================
+    # 2) Rewards r0 / r1
+    # ======================================================
+    ax = axes[1]
+
+    for i in range(len(r0_curves)):
+        if i == 0:
+            ax.plot(r0_curves[i], label="r0", color='red', alpha=0.7, linewidth=0.75)
+            ax.plot(r1_curves[i], label="r1", color='blue', alpha=0.7, linewidth=0.75)
+        else:
+            ax.plot(r0_curves[i], color='red', alpha=0.7, linewidth=0.75)
+            ax.plot(r1_curves[i], color='blue', alpha=0.7, linewidth=0.75)
+
+    ax.set_title("Separate objectives")
+    ax.set_xlabel("t")
+    ax.set_ylabel("Sliding cumulative reward (T=1000)")
+    ax.axhline(0, color='black')
+    ax.legend(loc="upper right")
+    ax.grid()
+
+    # ======================================================
+    # 3) V-MORE
+    # ======================================================
+    ax = axes[2]
+
+    for i in range(len(r0_curves)):
+        V_more_curve = vmore_curves(r0_curves[i], r1_curves[i])
+        ax.plot(V_more_curve, color='green', alpha=0.7, linewidth=0.75)
+
+    ax.set_title("V-MORE objective")
+    ax.set_xlabel("t")
+    ax.set_ylabel("V-MORE value")
+    ax.axhline(0, color='black')
+    ax.grid()
+
+    # ======================================================
+    # Global layout
+    # ======================================================
+    fig.suptitle(f"MDP {mdp} - {method} - {len(r0_curves)} episode en {int(exec_time)}s", fontsize=14)
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+    # ======================================================
+    # Save / Show
+    # ======================================================
+    if save_path is not None:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
