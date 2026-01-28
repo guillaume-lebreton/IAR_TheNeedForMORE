@@ -12,10 +12,7 @@ from algos_rl import (
 from mdp import mdp_standard, mdp_satiete, mdp_batterie, mdp_setpoint
 from utils import (
     avg_stay_length_curves,
-    plot_state_space_traversal,
     prepare_objective_curves,
-    plot_objective_curves,
-    plot_MORE_curve,
     plot_all
 )
 
@@ -98,7 +95,7 @@ def run_and_plot(algo_name, algo, mdp_name, verbose=False):
     # plot_MORE_curve(r0_curves, r1_curves, algo_name)
 
     #Plot les 3 dans une seule fenetre
-    path = "plots/mdp_" + mdp_name + "/" + algo_name
+    path = "../plots/mdp_" + mdp_name + "/" + algo_name
     plot_all(stays, r0_curves, r1_curves, algo_name, mdp_name, exec_time, path, show=False)
 
 
