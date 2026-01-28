@@ -133,23 +133,20 @@ class MDP_Setpoint(MDP_Batterie):
         self.setpoint_soif = setpoint_soif
         self.tolerance = tolerance
 
-
-    def penalite(self, niveau_batterie):
-        """ Calcule une pénalité en fonction de la distance au setpoint """
-        distance = abs(niveau_batterie - self.setpoint_faim)
+    def penalite(self, niveau_batterie, setpoint):
+        distance = abs(niveau_batterie - setpoint)
         if distance < self.tolerance:
-            return 1  # pas de pénalité si dans la tolérance
-        penalite = distance / self.Rmax 
-        return penalite
+            return 0.0
+        return distance / self.Rmax  # dans [0,1] si niveau,setpoint dans [0,Rmax]
 
     def get_reward(self, state):
         r0, r1 = super().get_reward(state)
-        # ajustement de la récompense en fonction de la distance au setpoint
-        
-        r0 *= (1 - self.penalite(self.niveau_faim_batterie))
-        r1 *= (1 - self.penalite(self.niveau_soif_batterie))
+
+        r0 *= (1 - self.penalite(self.niveau_faim_batterie, self.setpoint_faim))
+        r1 *= (1 - self.penalite(self.niveau_soif_batterie, self.setpoint_soif))
 
         return (r0, r1)
+
 
 
 mdp_standard = MDP(
