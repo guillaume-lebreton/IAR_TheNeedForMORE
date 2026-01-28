@@ -8,7 +8,8 @@ from tqdm import tqdm
     Algorithmes de Reinforcement Learning en plusieurs classes:
     - QLearningStandard : Q-learning avec somme pondérée des récompenses
     - QLearningObjectiveSwitching : Q-learning avec switching d'objectif
-    - QLearningMORE : Q-learning avec approche MORE
+    - QLearningMORE : Q-learning avec approche MORE et LLR
+    - QLearningMORE_DISCR_TAB : Q-learning avec approche MORE et discrétisation des poids dans une table
 
     Tous les algorithmes héritent de la classe RL qui contient les fonctions communes:
     Tous les algorithmes possèdent une fonction train()

@@ -165,5 +165,5 @@ def main(mdp_name,standard=True, switch=True, more=True, more_discr=True):
         run_and_plot(algo_name, more_discr, mdp_name, verbose=False)
 
 if __name__ == "__main__":
-    mdp_name = "setpoint"  # standard, satiete, batterie, setpoint
-    main(mdp_name, standard=True, switch=True, more=False, more_discr=True)
+    mdp_name = "standard"  # standard, satiete, batterie, setpoint
+    main(mdp_name, standard=True, switch=True, more=True, more_discr=True)
