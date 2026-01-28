@@ -72,7 +72,7 @@ Ajustez ces valeurs pour reproduire la figure ou explorer d'autres regimes.
 README.md
 Rolf2020-MORE-ICDL.pdf
 src/
-  algos_rl.py    # Algorithmes (standard, switch, MORE, MORE discretise)
+  algos_rl.py    # Algorithmes (standard, switch, MORE version LLR, MORE version discretise)
   mdp.py         # Definition des MDP
   mdp.MD         # Explication des MDP
   main.py        # Point d'entree : entrainement + generation de figures
