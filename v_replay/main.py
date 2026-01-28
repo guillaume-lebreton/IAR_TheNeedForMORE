@@ -5,7 +5,8 @@ import time
 from algos_rl import (
     QMORE,
     QLearningStandard,
-    QLearningObjectiveSwitching
+    QLearningObjectiveSwitching,
+    QMORE_DISCR_TAB
 )
 
 from mdp import mdp_standard, mdp_satiete, mdp_batterie, mdp_setpoint
@@ -32,7 +33,7 @@ K = 2  # nombre d'objectifs
 
 # MORE
 GAMMA_PASTE = 0.99
-PAS_DISCR = 0.001
+PAS_DISCR = 0.0001
 
 
 # ======================================================
@@ -104,7 +105,7 @@ def run_and_plot(algo_name, algo, mdp_name, verbose=False):
 # ======================================================
 # MAIN
 # ======================================================
-def main(mdp_name,standard=True, switch=True, more=True):
+def main(mdp_name,standard=True, switch=True, more=True, more_discr=True):
 
     mdp = choose_mdp(mdp_name)
     print("MDP choisi :", mdp_name)
@@ -147,7 +148,25 @@ def main(mdp_name,standard=True, switch=True, more=True):
             gamma_paste=GAMMA_PASTE
         )
         run_and_plot("MORE", more_llr, mdp_name, verbose=True)
+    
+    # -----------------------------
+    # MORE-Q DISCRÉTISATION TAB
+    # -----------------------------
+    if more_discr:
+        # W = np.arange(0, 1.01, PAS_DISCR)  # discretisation des poids w0 dans [0,1] avec un pas de PAS_DISCR
+        W = np.arange(1e-3, 1.0, PAS_DISCR)  # exclut 0 et 1
+        print("W:", W)
+        more_discr = QMORE_DISCR_TAB(
+            mdp=mdp,
+            gamma=GAMMA,
+            alpha=ALPHA,
+            epsilon_init=EPSILON,
+            gamma_paste=GAMMA_PASTE,
+            W=W
+        )
+        algo_name = "MORE_discr"
+        run_and_plot(algo_name, more_discr, mdp_name, verbose=False)
 
 if __name__ == "__main__":
-    mdp_name = "setpoint"
-    main(mdp_name, standard=True, switch=True, more=True)
+    mdp_name = "setpoint"  # standard, satiete, batterie, setpoint
+    main(mdp_name, standard=True, switch=True, more=False, more_discr=True)
